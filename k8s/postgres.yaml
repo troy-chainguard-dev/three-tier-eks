@@ -1,0 +1,98 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secret
+  namespace: three-tier-app
+type: Opaque
+stringData:
+  POSTGRES_DB: chaiku
+  POSTGRES_USER: user
+  POSTGRES_PASSWORD: password
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: three-tier-app
+data:
+  init.sql: |
+    CREATE TABLE courses (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100),
+        credits INTEGER
+    );
+
+    CREATE TABLE registrations (
+        id SERIAL PRIMARY KEY,
+        student VARCHAR(100),
+        course_id INTEGER REFERENCES courses(id)
+    );
+
+    INSERT INTO courses (name, credits) VALUES
+    ('Intro to Computer Science', 3),
+    ('Data Structures', 4),
+    ('Web Development', 3),
+    ('Cybersecurity Basics', 2);
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: three-tier-app
+  labels:
+    app: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: {{ECR_REGISTRY}}/three-tier-app/postgres:latest
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: postgres-secret
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+              subPath: pgdata
+            - name: init-scripts
+              mountPath: /var/lib/postgres/initdb
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "user", "-d", "chaiku"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: postgres-data
+          emptyDir: {}
+        - name: init-scripts
+          configMap:
+            name: postgres-init
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: three-tier-app
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+  type: ClusterIP

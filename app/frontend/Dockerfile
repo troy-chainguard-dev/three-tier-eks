@@ -1,0 +1,12 @@
+FROM cgr.dev/chainguard/node:latest-dev AS builder
+
+WORKDIR /app
+COPY . .
+RUN npm install
+
+FROM cgr.dev/chainguard/node:latest
+
+WORKDIR /app
+COPY --from=builder /app .
+
+ENTRYPOINT ["node", "src/server.js"]
