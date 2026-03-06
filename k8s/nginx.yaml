@@ -94,6 +94,8 @@ metadata:
     service.beta.kubernetes.io/aws-load-balancer-type: nlb
     service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
 spec:
+  loadBalancerSourceRanges:
+    {{ALLOWED_CIDRS}}
   selector:
     app: nginx
   ports:

@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Three-Tier EKS Architecture</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #0d1117;
+  font-family: 'IBM Plex Sans', sans-serif;
+  color: #c9d1d9;
+  padding: 40px;
+  min-height: 100vh;
+}
+
+.diagram { max-width: 1100px; margin: 0 auto; }
+
+.title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #f0f6fc;
+  margin-bottom: 8px;
+  letter-spacing: -0.5px;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: #8b949e;
+  margin-bottom: 36px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.aws-region {
+  border: 2px solid #3b82f6;
+  border-radius: 12px;
+  padding: 20px;
+  position: relative;
+  background: rgba(59, 130, 246, 0.03);
+}
+
+.region-label, .vpc-label, .eks-label, .subnet-label {
+  position: absolute;
+  top: -12px;
+  left: 20px;
+  background: #0d1117;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.region-label { color: #3b82f6; }
+.vpc-label { color: #22c55e; }
+.eks-label { color: #a855f7; }
+.subnet-label { color: #f59e0b; }
+
+.vpc {
+  border: 2px dashed #22c55e;
+  border-radius: 10px;
+  padding: 18px;
+  margin-top: 10px;
+  position: relative;
+  background: rgba(34, 197, 94, 0.02);
+}
+
+.eks-cluster {
+  border: 2px solid #a855f7;
+  border-radius: 10px;
+  padding: 18px;
+  margin-top: 16px;
+  position: relative;
+  background: rgba(168, 85, 247, 0.03);
+}
+
+.external-row {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 16px;
+  align-items: stretch;
+}
+
+.external-box {
+  background: #161b22;
+  border: 1.5px solid #30363d;
+  border-radius: 10px;
+  padding: 16px;
+  flex: 1;
+}
+
+.external-box-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f0f6fc;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.external-box-desc {
+  font-size: 11px;
+  color: #8b949e;
+  line-height: 1.5;
+}
+
+.arrow-col {
+  display: flex;
+  align-items: center;
+  color: #484f58;
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.badge-blue { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+.badge-green { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
+.badge-orange { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+.badge-purple { background: rgba(168, 85, 247, 0.15); color: #c084fc; }
+.badge-red { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+
+.ns-label {
+  font-size: 11px;
+  color: #8b949e;
+  font-family: 'IBM Plex Mono', monospace;
+  margin-bottom: 6px;
+  margin-top: 4px;
+}
+
+.pod-row { display: flex; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+
+.pod-group { flex: 1; min-width: 200px; }
+
+.pod-group-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+
+.pod {
+  background: #161b22;
+  border: 1.5px solid #30363d;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: border-color 0.2s;
+}
+
+.pod:hover { border-color: #58a6ff; }
+
+.pod-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.pod-icon.nginx { background: #065f46; color: #34d399; }
+.pod-icon.node { background: #164e63; color: #22d3ee; }
+.pod-icon.python { background: #422006; color: #fbbf24; }
+.pod-icon.postgres { background: #1e1b4b; color: #818cf8; }
+
+.pod-name { font-size: 13px; font-weight: 600; color: #e6edf3; }
+.pod-detail { font-size: 11px; color: #8b949e; font-family: 'IBM Plex Mono', monospace; }
+
+.pod-replicas {
+  margin-left: auto;
+  background: #21262d;
+  color: #8b949e;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.svc {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-family: 'IBM Plex Mono', monospace;
+  color: #8b949e;
+  text-align: center;
+}
+
+.svc .type { color: #58a6ff; }
+
+.subnets { display: flex; gap: 14px; margin-top: 16px; }
+
+.subnet {
+  flex: 1;
+  border: 1.5px solid #f59e0b;
+  border-radius: 8px;
+  padding: 14px;
+  position: relative;
+  background: rgba(245, 158, 11, 0.02);
+}
+
+.subnet-inner {
+  font-size: 11px;
+  color: #8b949e;
+  text-align: center;
+  padding: 8px 0;
+}
+
+.subnet-inner code {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+}
+
+.endpoint-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+
+.vpc-endpoint {
+  font-size: 10px;
+  font-family: 'IBM Plex Mono', monospace;
+  color: #8b949e;
+  background: #21262d;
+  padding: 3px 10px;
+  border-radius: 4px;
+  border: 1px solid #30363d;
+}
+
+.supply-chain {
+  border: 1.5px solid #30363d;
+  border-radius: 10px;
+  padding: 18px;
+  margin-top: 28px;
+  background: #161b22;
+}
+
+.supply-chain-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f0f6fc;
+  margin-bottom: 14px;
+}
+
+.chain-steps { display: flex; align-items: center; justify-content: center; }
+
+.chain-step {
+  background: #0d1117;
+  border: 1.5px solid #30363d;
+  border-radius: 8px;
+  padding: 12px 18px;
+  text-align: center;
+  min-width: 160px;
+}
+
+.chain-step-num {
+  font-size: 10px;
+  font-weight: 700;
+  color: #484f58;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+}
+
+.chain-step-name { font-size: 13px; font-weight: 600; color: #e6edf3; }
+
+.chain-step-detail {
+  font-size: 10px;
+  color: #8b949e;
+  font-family: 'IBM Plex Mono', monospace;
+  margin-top: 4px;
+}
+
+.chain-arrow { color: #484f58; font-size: 24px; padding: 0 6px; }
+
+.legend {
+  display: flex;
+  gap: 20px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #8b949e;
+}
+
+.legend-swatch {
+  width: 24px;
+  height: 0;
+  border-top-width: 2px;
+}
+
+.legend-swatch.region { border-top: 2px solid #3b82f6; }
+.legend-swatch.vpc { border-top: 2px dashed #22c55e; }
+.legend-swatch.subnet { border-top: 2px solid #f59e0b; }
+.legend-swatch.eks { border-top: 2px solid #a855f7; }
+
+.note {
+  margin-top: 20px;
+  padding: 12px 16px;
+  background: rgba(245, 158, 11, 0.06);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: 8px;
+  font-size: 12px;
+  color: #d29922;
+  line-height: 1.5;
+}
+</style>
+</head>
+<body>
+<div class="diagram">
+  <div class="title">Three-Tier EKS with Chainguard Images</div>
+  <div class="subtitle">Secure container deployment on Amazon EKS with private ECR registry</div>
+
+  <div class="external-row">
+    <div class="external-box" style="max-width:180px;">
+      <div class="external-box-title">&#x1F310; Internet</div>
+      <div class="external-box-desc">
+        Restricted to<br/><span class="badge badge-red">ALLOWED_CIDRS</span>
+      </div>
+    </div>
+    <div class="arrow-col">&#x2192;</div>
+    <div class="external-box" style="max-width:220px;">
+      <div class="external-box-title"><span class="badge badge-blue">NLB</span> Network Load Balancer</div>
+      <div class="external-box-desc">internet-facing &bull; port 80<br/>IP-restricted via Security Group</div>
+    </div>
+    <div class="arrow-col">&#x2192;</div>
+    <div class="external-box" style="flex:2;">
+      <div class="external-box-title"><span class="badge badge-orange">ECR</span> Amazon Elastic Container Registry</div>
+      <div class="external-box-desc">
+        Private registry &bull; scan-on-push &bull; AES256 encryption<br/>
+        <code style="color:#58a6ff;font-size:11px;">&lt;account&gt;.dkr.ecr.&lt;region&gt;.amazonaws.com/three-tier-app/*</code>
+      </div>
+    </div>
+  </div>
+
+  <div class="aws-region">
+    <div class="region-label">&#x2601; AWS Region (us-east-1)</div>
+    <div class="vpc">
+      <div class="vpc-label">VPC</div>
+      <div class="eks-cluster">
+        <div class="eks-label">&#x2638; Amazon EKS Cluster</div>
+        <div class="ns-label">namespace: three-tier-app</div>
+
+        <div class="pod-row">
+          <div class="pod-group">
+            <div class="pod-group-title">Reverse Proxy</div>
+            <div class="pod">
+              <div class="pod-icon nginx">N</div>
+              <div>
+                <div class="pod-name">nginx</div>
+                <div class="pod-detail">cgr.dev/chainguard/nginx</div>
+              </div>
+              <div class="pod-replicas">x2</div>
+            </div>
+            <div class="svc"><span class="type">LoadBalancer</span> :80</div>
+          </div>
+
+          <div class="pod-group">
+            <div class="pod-group-title">Frontend</div>
+            <div class="pod">
+              <div class="pod-icon node">JS</div>
+              <div>
+                <div class="pod-name">frontend</div>
+                <div class="pod-detail">cgr.dev/chainguard/node</div>
+              </div>
+              <div class="pod-replicas">x2</div>
+            </div>
+            <div class="svc"><span class="type">ClusterIP</span> :3000</div>
+          </div>
+
+          <div class="pod-group">
+            <div class="pod-group-title">Backend API</div>
+            <div class="pod">
+              <div class="pod-icon python">Py</div>
+              <div>
+                <div class="pod-name">backend</div>
+                <div class="pod-detail">cgr.dev/chainguard/python</div>
+              </div>
+              <div class="pod-replicas">x2</div>
+            </div>
+            <div class="svc"><span class="type">ClusterIP</span> :5000</div>
+          </div>
+
+          <div class="pod-group">
+            <div class="pod-group-title">Database</div>
+            <div class="pod">
+              <div class="pod-icon postgres">PG</div>
+              <div>
+                <div class="pod-name">postgres</div>
+                <div class="pod-detail">cgr.dev/chainguard/postgres</div>
+              </div>
+              <div class="pod-replicas">x1</div>
+            </div>
+            <div class="svc"><span class="type">ClusterIP</span> :5432</div>
+          </div>
+        </div>
+
+        <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
+          <span class="badge badge-purple">Secret: postgres-secret</span>
+          <span class="badge badge-purple">ConfigMap: nginx-config</span>
+          <span class="badge badge-purple">ConfigMap: postgres-init</span>
+        </div>
+      </div>
+
+      <div class="subnets">
+        <div class="subnet">
+          <div class="subnet-label">Private Subnet &bull; AZ-a</div>
+          <div class="subnet-inner">Managed Node Group<br/><code>t3.medium</code></div>
+        </div>
+        <div class="subnet">
+          <div class="subnet-label">Private Subnet &bull; AZ-b</div>
+          <div class="subnet-inner">Managed Node Group<br/><code>t3.medium</code></div>
+        </div>
+        <div class="subnet">
+          <div class="subnet-label">Private Subnet &bull; AZ-c</div>
+          <div class="subnet-inner">Managed Node Group<br/><code>t3.medium</code></div>
+        </div>
+      </div>
+
+      <div style="margin-top:14px;">
+        <div style="font-size:11px;font-weight:600;color:#8b949e;margin-bottom:6px;">VPC Endpoints (private subnet ECR access)</div>
+        <div class="endpoint-row">
+          <div class="vpc-endpoint">com.amazonaws.&lt;region&gt;.ecr.api</div>
+          <div class="vpc-endpoint">com.amazonaws.&lt;region&gt;.ecr.dkr</div>
+          <div class="vpc-endpoint">com.amazonaws.&lt;region&gt;.s3 (Gateway)</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
+      <span class="badge badge-green">IAM: AmazonEKSWorkerNodePolicy</span>
+      <span class="badge badge-green">IAM: AmazonEKS_CNI_Policy</span>
+      <span class="badge badge-green">IAM: AmazonEC2ContainerRegistryReadOnly</span>
+      <span class="badge badge-green">IAM: OIDC Provider</span>
+    </div>
+  </div>
+
+  <div class="supply-chain">
+    <div class="supply-chain-title">&#x1F50F; Image Supply Chain</div>
+    <div class="chain-steps">
+      <div class="chain-step">
+        <div class="chain-step-num">Source</div>
+        <div class="chain-step-name">Chainguard Images</div>
+        <div class="chain-step-detail">cgr.dev/chainguard/*</div>
+        <div style="margin-top:6px;"><span class="badge badge-green">0 CVEs</span></div>
+      </div>
+      <div class="chain-arrow">&#x2192;</div>
+      <div class="chain-step">
+        <div class="chain-step-num">Build</div>
+        <div class="chain-step-name">Docker Build</div>
+        <div class="chain-step-detail">--platform linux/amd64</div>
+        <div style="margin-top:6px;"><span class="badge badge-orange">Multi-stage</span></div>
+      </div>
+      <div class="chain-arrow">&#x2192;</div>
+      <div class="chain-step">
+        <div class="chain-step-num">Stage</div>
+        <div class="chain-step-name">Amazon ECR</div>
+        <div class="chain-step-detail">Private registry</div>
+        <div style="margin-top:6px;"><span class="badge badge-blue">Scan on push</span></div>
+      </div>
+      <div class="chain-arrow">&#x2192;</div>
+      <div class="chain-step">
+        <div class="chain-step-num">Deploy</div>
+        <div class="chain-step-name">EKS Pods</div>
+        <div class="chain-step-detail">Pull from ECR</div>
+        <div style="margin-top:6px;"><span class="badge badge-purple">Distroless</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-swatch region"></div> AWS Region</div>
+    <div class="legend-item"><div class="legend-swatch vpc"></div> VPC</div>
+    <div class="legend-item"><div class="legend-swatch subnet"></div> Private Subnet</div>
+    <div class="legend-item"><div class="legend-swatch eks"></div> EKS Cluster</div>
+  </div>
+
+  <div class="note">
+    <strong>Note:</strong> For clusters with nodes in private subnets, VPC Endpoints for ECR (ecr.api, ecr.dkr) and S3 (gateway) are required to pull images without traversing the public internet.
+  </div>
+</div>
+</body>
+</html>

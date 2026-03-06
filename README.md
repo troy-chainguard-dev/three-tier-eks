@@ -13,25 +13,11 @@ This is the cloud-native companion to [three-tier-sample-app](https://github.com
 
 ## Architecture
 
-```
-                    ┌─────────────────────────────────────────────────────────┐
-                    │                     Amazon EKS                          │
-                    │                                                         │
-  Internet ──▶  [ NLB ] ──▶  [ nginx ]  ──▶  [ frontend (Node.js) ]         │
-                    │              │                                           │
-                    │              └──────▶  [ backend (Flask/Python) ]       │
-                    │                              │                           │
-                    │                         [ PostgreSQL ]                   │
-                    └─────────────────────────────────────────────────────────┘
+<div align="center">
+  <img src="img/architecture.png" alt="Three-Tier EKS Architecture Diagram" width="100%" style="border-radius: 15px;"/>
+</div>
 
-  All images sourced from:
-  ┌──────────────────────────────┐        ┌──────────────────────────┐
-  │  cgr.dev/chainguard/nginx    │──push──▶│  Amazon ECR (private)   │
-  │  cgr.dev/chainguard/node     │──push──▶│  <acct>.dkr.ecr.<region>│
-  │  cgr.dev/chainguard/python   │──push──▶│  .amazonaws.com         │
-  │  cgr.dev/chainguard/postgres │──push──▶│                          │
-  └──────────────────────────────┘        └──────────────────────────┘
-```
+> **Interactive version**: Open [`img/architecture.html`](img/architecture.html) in a browser for a zoomable, hover-enabled version of this diagram.
 
 ### Container Images
 
@@ -76,8 +62,11 @@ If you're comfortable with the prerequisites above and want to get running fast:
 # 3. Build Chainguard images and push to ECR (still in second terminal)
 ./scripts/03-push-chainguard-images-to-ecr.sh us-east-1
 
-# 4. Once the cluster is ready, deploy the app
+# 4. Once the cluster is ready, deploy the app (auto-detects your IP for LB access)
 ./scripts/04-deploy-app.sh us-east-1
+
+# Or specify allowed IPs explicitly:
+# ALLOWED_CIDRS="1.2.3.4/32,5.6.7.8/32" ./scripts/04-deploy-app.sh us-east-1
 ```
 
 Or follow the detailed walkthrough below.
@@ -213,12 +202,18 @@ Deploy all Kubernetes resources (namespace, secrets, deployments, services):
 ./scripts/04-deploy-app.sh us-east-1
 ```
 
+By default, the script **auto-detects your public IP** and restricts the LoadBalancer to only accept traffic from that IP. To allow additional IPs (e.g., teammates or a demo audience), pass them as a comma-separated list:
+
+```bash
+ALLOWED_CIDRS="1.2.3.4/32,5.6.7.8/32" ./scripts/04-deploy-app.sh us-east-1
+```
+
 **What this does:**
 - Creates the `three-tier-app` namespace
-- Substitutes your ECR registry URI into the manifests
+- Substitutes your ECR registry URI and allowed CIDRs into the manifests
 - Deploys PostgreSQL with ephemeral storage (`emptyDir`)
 - Deploys the backend (Flask) and frontend (Node.js) with health checks
-- Deploys nginx as a reverse proxy behind an AWS Network Load Balancer
+- Deploys nginx as a reverse proxy behind an AWS Network Load Balancer (IP-restricted)
 - Waits for all deployments to become ready
 
 #### Verify the Deployment

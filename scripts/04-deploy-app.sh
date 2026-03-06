@@ -2,9 +2,13 @@
 set -euo pipefail
 
 # Deploys the three-tier application to EKS.
-# Substitutes the ECR registry URI into the Kubernetes manifests and applies them.
+# Substitutes the ECR registry URI and allowed CIDRs into the Kubernetes manifests.
 #
 # Usage: ./scripts/04-deploy-app.sh [AWS_REGION]
+#
+# Environment variables:
+#   ALLOWED_CIDRS  Comma-separated CIDRs for LoadBalancer access (e.g. "1.2.3.4/32,5.6.7.8/32")
+#                  If not set, auto-detects your current public IP.
 
 AWS_REGION="${1:-us-east-1}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -28,18 +32,42 @@ fi
 AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
+# Build the allowed CIDRs for the LoadBalancer
+if [ -n "${ALLOWED_CIDRS:-}" ]; then
+  IFS=',' read -ra CIDR_ARRAY <<< "$ALLOWED_CIDRS"
+else
+  MY_IP=$(curl -s --connect-timeout 5 https://checkip.amazonaws.com)
+  if [ -z "$MY_IP" ]; then
+    echo "ERROR: Could not detect your public IP. Set ALLOWED_CIDRS manually:"
+    echo '    ALLOWED_CIDRS="1.2.3.4/32,5.6.7.8/32" ./scripts/04-deploy-app.sh'
+    exit 1
+  fi
+  CIDR_ARRAY=("${MY_IP}/32")
+  echo "==> Auto-detected your public IP: ${MY_IP}"
+fi
+
+# Format CIDRs as YAML list entries
+CIDRS_YAML=""
+for cidr in "${CIDR_ARRAY[@]}"; do
+  cidr=$(echo "$cidr" | xargs)
+  CIDRS_YAML="${CIDRS_YAML}    - ${cidr}\n"
+done
+
 echo "==> Deploying three-tier app to EKS..."
 echo "    Cluster: $(kubectl config current-context)"
 echo "    ECR Registry: ${ECR_REGISTRY}"
+echo "    Allowed CIDRs: ${CIDR_ARRAY[*]}"
 echo ""
 
 # Apply namespace first
 kubectl apply -f "${PROJECT_ROOT}/k8s/namespace.yaml"
 
-# Generate manifests with the correct ECR registry URI and apply
+# Generate manifests with the correct ECR registry URI and allowed CIDRs, then apply
 for manifest in postgres.yaml backend.yaml frontend.yaml nginx.yaml; do
   echo "--- Applying ${manifest} ---"
-  sed "s|{{ECR_REGISTRY}}|${ECR_REGISTRY}|g" "${PROJECT_ROOT}/k8s/${manifest}" | kubectl apply -f -
+  sed -e "s|{{ECR_REGISTRY}}|${ECR_REGISTRY}|g" \
+      -e "s|{{ALLOWED_CIDRS}}|$(echo -e "$CIDRS_YAML")|g" \
+    "${PROJECT_ROOT}/k8s/${manifest}" | kubectl apply -f -
 done
 
 echo ""
